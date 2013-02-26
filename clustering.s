@@ -11,11 +11,12 @@ LF = 10
      .data
 archivo: .asciiz "ejemplo.txt"
 buf:     .space 1000
-espacio: .word 0:20
+espacio: .word 0:200
 distancias: .word 0:50
-blanco:  .asciiz " "
+nombres: .word 0:50
 m1: .asciiz "\n"
 m2: .asciiz " Mensaje 2 \n"
+separador: .asciiz " - "
 componentes: .word 0
 parametros: .word 0
 clusters: .word 0
@@ -69,6 +70,19 @@ main:
     # Almacena el valor del número de clusters deseados
     sw $t0 clusters
 
+    lw $s0 clusters # Cantidad de clusters deseados
+    lw $s1 componentes # Cantidad inicial de componentes
+
+    la $s4 nombres
+    li $t0 0
+    
+cicloNombres:
+    addi $t1 $t1 48
+    sb $t1 0($t2)
+    addi $s4 $s4 1
+    bneq $t0 $s0 cicloNombres
+     
+matrizEspacio:
     la $t7 espacio # Dirección de la matriz que contiene la información de los documentos
 
     la $t0 componentes
@@ -139,10 +153,7 @@ fin:
 
     la $t0 espacio    
 
-# Comienza el Clustering
-    lw $s0 clusters # Cantidad de clusters deseados
-    lw $s1 componentes # Cantidad inicial de componentes
-    
+# Comienza el Clustering    
     beq $s0 $s1 Final # Cuando la cantidad de clusters y de componentes es igual, terminé
 
     li $t6 0 # El registro t6 es mi i en la matriz. Inicializo i en 0
@@ -195,16 +206,16 @@ finMatriz:
 
     la $t0 distancias
     lw $t1 4($t0) # Tomo como primer elemento el primer elemento de la matriz de distancias
-    li $t8 0 # Fila en la que se encuentra el elemento que estoy comparando
-    li $t9 0 # Columna en la que se encuentra el elemento que estoy comparando
+    li $s6 0 # Fila en la que se encuentra el elemento que estoy comparando
+    li $s7 0 # Columna en la que se encuentra el elemento que estoy comparando
 
 minimaDistancia:
-    addi $t9 $t9 1 # Me muevo a la siguiente columna
+    addi $s7 $s7 1 # Me muevo a la siguiente columna
     bne $t9 $s1 sigue # Mientras no llegue al último elemento de la fila, sigo
-    addi $t8 $t8 1 # Cuando llego al último elemento de la fila, incremento el contador de fila
+    addi $s6 $s6 1 # Cuando llego al último elemento de la fila, incremento el contador de fila
 
-    beq $t8 $s1 Centroide # Cuando llegue a la última fila, terminé de buscar la mínima distancia
-    li $t9 0 # Cuando llego al último elemento de la fila, reinicio el contador de columna
+    beq $s6 $s1 Centroide # Cuando llegue a la última fila, terminé de buscar la mínima distancia
+    li $s7 0 # Cuando llego al último elemento de la fila, reinicio el contador de columna
 
 sigue:
     addi $t0 $t0 4 # Me muevo al siguiente elemento de la matriz
@@ -216,10 +227,22 @@ sigue:
 
     move $t1 $t2
 
+    b minimaDistancia
+
+Centroide:
+
 #########################    
 
     li $v0 1
-    move $a0 $t1
+    move $a0 $s6
+    syscall
+
+    li $v0 4
+    la $a0 blanco
+    syscall
+
+    li $v0 1
+    move $a0 $s7
     syscall
 
     li $v0 4
@@ -227,33 +250,38 @@ sigue:
     syscall
 
 ########################
-    b minimaDistancia
 
-Centroide:
+    addi $t8 $s6 -1 # Como indica el número del archivo, le resto uno para que indique la fila que corresponde en la matriz de archivo
+    mul $t8 $t8 8 # Me voy a la posición cero de la fila que me interesa
+    addi $t9 $s7 -1 # Como indica el número del archivo, le resto uno para que indique la fila que corresponde en la matriz de archivo
+    mul $t9 $t9 8 # Me voy a la posición cero de la fila que me interesa
 
-promedioDocumentos:
     la $t0 espacio
-    move $t1 $t0
-    mul $t8 $t8 4
-    mul $t9 $t9 4
-    add $t0 $t0 $t9
-    add $t1 $t1 $t9
-    add $t0 $t0 $t1
-    div $t0 2
-    mfhi $t0
+    add $t1 $t0 $t8 # Posición cero de la primera fila a unir
+    add $t2 $t0 $t9 # Posición cero de la segunda fila a unir
 
-promedioAccesos:
-    la $t0 espacio
-    move $t1 $t0
-    mul $t8 $t8 4
-    addi $t8 $t8 4
-    mul $t9 $t9 4
-    addi $t9 $t9 4
-    add $t0 $t0 $t9
-    add $t1 $t1 $t9
-    add $t0 $t0 $t1
-    div $t0 2
-    mfhi $t0
+# Calculo el promedio de los tamaños
+    lw $t3 0($t1)
+    lw $t4 0($t2)
+    add $t3 $t3 $t4
+    div $t3 $t3 2
+
+# Calculo el promedio de los accesos
+    lw $t4 4($t1)
+    lw $t5 4($t2)
+    add $t4 $t4 $t5
+    div $t4 $t4 2
+
+# Reagrupa los archivos
+    blt $s7 $s6 menor2
+    la $t0 nombres
+    lw $t1 $s6
+    addi $t0 $t0 $t1
+    
+menor2:
+    
+
+
 
 Final:
     # Finaliza el programa
